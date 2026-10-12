@@ -663,7 +663,7 @@ func (c *Client) readResponse() error {
 		err = c.readResponseData(typ)
 	}
 	if err != nil {
-		return fmt.Errorf("in %v: %v", token, err)
+		return fmt.Errorf("in %v: %w", token, err)
 	}
 
 	if !c.dec.ExpectCRLF() {
@@ -944,6 +944,13 @@ func (c *Client) readResponseData(typ string) error {
 				c.setCaps(nil) // request initial capabilities
 			}
 			close(c.greetingCh)
+		}
+		if typ == "BYE" && findPendingCmdByType[*logoutCommand](c) == nil {
+			return &imap.Error{
+				Type: imap.StatusResponseTypeBye,
+				Code: imap.ResponseCode(code),
+				Text: text,
+			}
 		}
 	case "ID":
 		return c.handleID()
