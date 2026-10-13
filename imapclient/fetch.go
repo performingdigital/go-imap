@@ -829,12 +829,15 @@ func isMsgAttNameChar(ch byte) bool {
 }
 
 func readEnvelope(dec *imapwire.Decoder, options *Options) (*imap.Envelope, error) {
-	var envelope imap.Envelope
-
 	if !dec.ExpectSpecial('(') {
 		return nil, dec.Err()
 	}
+	return readEnvelopeContents(dec, options)
+}
 
+// readEnvelopeContents reads an envelope after its opening parenthesis.
+func readEnvelopeContents(dec *imapwire.Decoder, options *Options) (*imap.Envelope, error) {
+	var envelope imap.Envelope
 	var date, subject string
 	if !dec.ExpectNString(&date) || !dec.ExpectSP() || !dec.ExpectNString(&subject) || !dec.ExpectSP() {
 		return nil, dec.Err()
@@ -990,10 +993,14 @@ func readBodyType1part(dec *imapwire.Decoder, typ string, options *Options) (*im
 		return &bs, nil
 	}
 
-	if strings.EqualFold(bs.Type, "message") && (strings.EqualFold(bs.Subtype, "rfc822") || strings.EqualFold(bs.Subtype, "global")) {
+	// Gmail can omit all message-specific fields while still returning extension
+	// data. An envelope starts with '(', whereas the first extension is an
+	// nstring (MD5). Leave that token untouched for readBodyExt1part below.
+	isMessage := strings.EqualFold(bs.Type, "message") && (strings.EqualFold(bs.Subtype, "rfc822") || strings.EqualFold(bs.Subtype, "global"))
+	if isMessage && dec.Special('(') {
 		var msg imap.BodyStructureMessageRFC822
 
-		msg.Envelope, err = readEnvelope(dec, options)
+		msg.Envelope, err = readEnvelopeContents(dec, options)
 		if err != nil {
 			return nil, err
 		}

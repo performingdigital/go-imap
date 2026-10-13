@@ -949,6 +949,13 @@ func (c *Client) readResponseData(typ string) error {
 			}
 			close(c.greetingCh)
 		}
+		if typ == "BYE" && findPendingCmdByType[*logoutCommand](c) == nil {
+			return &imap.Error{
+				Type: imap.StatusResponseTypeBye,
+				Code: imap.ResponseCode(code),
+				Text: text,
+			}
+		}
 	case "ID":
 		return c.handleID()
 	case "CAPABILITY":
